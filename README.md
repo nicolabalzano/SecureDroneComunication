@@ -1,6 +1,7 @@
 # Drone Control via MAVLink and MQTT
 
-This project enables remote control of a MAVLink-compatible drone (e.g., ArduPilot, PX4) over an MQTT messaging bus. It allows for sending commands to the drone and receiving telemetry data through a secure MQTT connection.
+This project enables remote control of a MAVLink-compatible drone (e.g., ArduPilot) over an MQTT messaging bus. It allows for sending commands to the drone and receiving telemetry data through a secure MQTT connection.
+
 
 ## Overview
 
@@ -55,7 +56,8 @@ The system consists of two main Python scripts:
 *   A MAVLink-compatible drone or a simulator (e.g., ArduPilot SITL, PX4 SITL).
 *   An MQTT broker, such as Mosquitto, configured to use TLS.
 *   (For `ground_station.py` keyboard input): A Unix-like system (Linux, macOS) due to the use of `termios` and `tty` modules.
-
+*    tmux for linux terminal
+  
 ## Setup
 
 ### 1. MQTT Broker (Mosquitto with TLS)
@@ -112,14 +114,10 @@ Before running the scripts, review and update the configuration constants at the
 
 ## Usage
 
-1.  **Start your MQTT Broker** (if not already running).
-2.  **Start your Drone/Simulator** and ensure its MAVLink interface is active.
-3.  **Run `drone_mqtt.py`** on the drone or its companion computer:
+1.  Run the `run_drone.sh` that startup ArduCopter drone simulator and the MQTT broker
     ```bash
-    python drone_mqtt.py
+    ./run_drone.sh
     ```
-    Check the console output for successful MAVLink and MQTT connection messages.
-
 4.  **Run `ground_station.py`** on your remote control computer:
     ```bash
     python ground_station.py

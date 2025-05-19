@@ -142,6 +142,7 @@ Before running the scripts, review and update the configuration constants at the
 *   **Mode Changes:**
     *   `M`: Switch to STABILIZE mode
     *   `L`: Switch to LOITER mode
+    *   `H`: Swith to RTL mode
 *   **Other:**
     *   `.`: Exit the ground station script.
 

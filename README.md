@@ -293,7 +293,6 @@ The communication channel between the drone script, ground station, and the MQTT
 
 *   Display real-time telemetry data (position, attitude, battery, etc.) in the ground station terminal.
 *   Implement a more robust GUI for the ground station.
-*   Add support for waypoint missions.
 *   Allow dynamic adjustment of parameters like speed from the ground station.
 *   More comprehensive error handling and user feedback for command acknowledgments.
 

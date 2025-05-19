@@ -21,7 +21,8 @@ KEY_FILE = "/etc/mosquitto/certs/client.key"
 
 # Callback telemetria
 def on_message(client, userdata, message):
-    logging.info(f"Telemetry received: {message.payload.decode()}")
+    #logging.info(f"Telemetry received: {message.payload.decode()}")
+    pass
 
 # Lettura tasti senza invio
 def getch():
@@ -36,25 +37,35 @@ def getch():
 
 # Thread gestione input tastiera
 def keyboard_loop(client):
-    logging.info("Controllo drone: WASD per pitch/roll, Q/E throttle, C takeoff, X land.")
+    logging.info("Drone control: WASD per movimento, Q/E su/giù, C takeoff, X land, SPAZIO per fermare.")
     while True:
         key = getch().lower()
         cmd = {}
-        # Map tasti a comando JSON
+        
+        # Comandi di velocità per modalità GUIDED
+        meter_per_second = 5.0
         if key == 'w':
-            cmd = {'rc_override': {1: 1500, 2: 1600}}
+            cmd = {'velocity': {"vx": meter_per_second, "vy": 0.0, "vz": 0.0}} 
         elif key == 's':
-            cmd = {'rc_override': {1: 1500, 2: 1400}}
+            cmd = {'velocity': {"vx": -meter_per_second, "vy": 0.0, "vz": 0.0}} 
         elif key == 'a':
-            cmd = {'rc_override': {1: 1400, 2: 1500}}
+            cmd = {'velocity': {"vx": 0.0, "vy": -meter_per_second, "vz": 0.0}} 
         elif key == 'd':
-            cmd = {'rc_override': {1: 1600, 2: 1500}}
+            cmd = {'velocity': {"vx": 0.0, "vy": meter_per_second, "vz": 0.0}}
         elif key == 'q':
-            cmd = {'rc_override': {3: 1600}}
+            cmd = {'velocity': {"vx": 0.0, "vy": 0.0, "vz": -meter_per_second/2}}
         elif key == 'e':
-            cmd = {'rc_override': {3: 1400}}
+            cmd = {'velocity': {"vx": 0.0, "vy": 0.0, "vz": meter_per_second/2}}
+        elif key == ' ':  # Spazio per fermarsi
+            cmd = {'velocity': {"vx": 0.0, "vy": 0.0, "vz": 0.0}}  # Stop
+            
+        # Modalità e comandi esistenti
         elif key == 'c':
             cmd = {'mode': 'GUIDED', 'takeoff_alt': 10}
+        elif key == 'm':
+            cmd = {'mode': 'STABILIZE'}
+        elif key == 'l':
+            cmd = {'mode': 'LOITER'}
         elif key == 'x':
             cmd = {'mode': 'LAND'}
         elif key == '.':
@@ -90,6 +101,6 @@ try:
     while True:
         pass
 except KeyboardInterrupt:
-    logging.info("Chiusura Ground Station")
+    logging.info("Closing Ground Station")
     client.loop_stop()
     sys.exit(0)

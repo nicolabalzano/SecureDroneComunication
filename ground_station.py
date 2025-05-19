@@ -83,7 +83,7 @@ def keyboard_loop(client):
         elif key == 'x':
             cmd = {'mode': 'LAND'}
         elif key == 'h':
-            cmd = {'return_home': True}
+            cmd = {'mode': 'RTL'}
             logging.info("Return to home command")
         # New commands for autonomous navigation
         elif key == 'p':

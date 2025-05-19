@@ -148,7 +148,6 @@ def on_command(client, userdata, msg):
                     mode_id = int(mode)
                     connection.mav.set_mode_send(
                         connection.target_system,
-                        connection.target_component,
                         mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
                         mode_id
                     )
@@ -208,13 +207,6 @@ def on_command(client, userdata, msg):
                 lon = float(pos['lon']) 
                 alt = float(pos['alt'])
                 
-                # Default high speed (meters/second)
-                speed = 15.0  # Faster speed for position commands
-                
-                # Check if speed is specified in command
-                if 'speed' in pos:
-                    speed = float(pos['speed'])
-                
                 # First switch to GUIDED mode
                 connection.mav.set_mode_send(
                     connection.target_system,
@@ -224,56 +216,43 @@ def on_command(client, userdata, msg):
                 )
                 time.sleep(0.5)
                 
-                # Set vehicle speed
-                connection.mav.command_long_send(
-                    connection.target_system,
-                    connection.target_component,
-                    mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,
-                    0,      # confirmation
-                    1,      # speed type (1=ground speed)
-                    speed,  # speed (m/s)
-                    -1,     # throttle (-1=no change)
-                    0, 0, 0, 0  # unused parameters
-                )
-                logger.info(f"Setting speed to {speed} m/s")
-                
                 # Send waypoint using mission_item command
                 connection.mav.mission_item_send(
                     connection.target_system,
                     connection.target_component,
-                    0,      # seq
-                    0,      # frame
+                    0,   # seq
+                    0,   # frame
                     mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                    2,      # current (2 means guided mode)
-                    0,      # autocontinue
-                    0,      # param1: hold time
-                    speed,  # param2: acceptance radius - using speed here
-                    0,      # param3: pass radius
-                    0,      # param4: yaw
-                    lat,    # param5: lat
-                    lon,    # param6: lon
-                    alt     # param7: alt
+                    2,   # current (2 means guided mode)
+                    0,   # autocontinue
+                    0,   # param1: hold time
+                    0,   # param2: accept radius
+                    0,   # param3: pass radius
+                    0,   # param4: yaw
+                    lat, # param5: lat
+                    lon, # param6: lon
+                    alt  # param7: alt
                 )
                 
                 # Alternative method using MISSION_ITEM_INT for better precision
                 connection.mav.mission_item_int_send(
                     connection.target_system,
                     connection.target_component,
-                    0,      # seq
-                    0,      # frame
+                    0,   # seq
+                    0,   # frame
                     mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
-                    2,      # current
-                    0,      # autocontinue
-                    0,      # param1: hold time
-                    speed,  # param2: acceptance radius - using speed here
-                    0,      # param3: pass radius
-                    0,      # param4: yaw
+                    2,   # current
+                    0,   # autocontinue
+                    0,   # param1: hold time
+                    0,   # param2: accept radius
+                    0,   # param3: pass radius
+                    0,   # param4: yaw
                     int(lat * 1e7),  # param5: lat (scaled to int)
                     int(lon * 1e7),  # param6: lon (scaled to int)
-                    alt     # param7: alt
+                    alt   # param7: alt
                 )
                 
-                logger.info(f"Sent position command at speed {speed} m/s: lat={lat}, lon={lon}, alt={alt}")
+                logger.info(f"Sent position command: lat={lat}, lon={lon}, alt={alt}")
             else:
                 logger.error("Incomplete position data in command")
         
@@ -310,45 +289,6 @@ def on_command(client, userdata, msg):
             )
             logger.info(f"Sent waypoint command: lat={lat}, lon={lon}, alt={alt}")
         
-        # Return to home command
-        if 'return_home' in command:
-            # Try multiple methods to ensure RTL works properly
-            
-            # Method 1: Set RTL mode by name using the mode_mapping
-            connection.mav.set_mode_send(
-                connection.target_system,
-                connection.target_component,
-                mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
-                6  # RTL mode
-            )
-            logger.info("RTL mode command sent (method 1)")
-            time.sleep(0.2)
-            
-            # Method 2: Use the explicit RTL command
-            connection.mav.command_long_send(
-                connection.target_system,
-                connection.target_component,
-                mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
-                0,  # confirmation
-                0, 0, 0, 0, 0, 0, 0  # params (all unused)
-            )
-            logger.info("RTL command sent (method 2)")
-            time.sleep(0.2)
-            
-            # Method 3: Set mode using command_long with MAV_CMD_DO_SET_MODE
-            connection.mav.command_long_send(
-                connection.target_system,
-                connection.target_component,
-                mavutil.mavlink.MAV_CMD_DO_SET_MODE,
-                0,  # confirmation
-                mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
-                6,  # RTL mode
-                0, 0, 0, 0, 0  # unused params
-            )
-            logger.info("RTL mode set via DO_SET_MODE (method 3)")
-            
-            logger.info("Return to home command processing complete")
-        
         # Velocity command
         if 'velocity' in command:
             vel = command['velocity']
@@ -358,15 +298,15 @@ def on_command(client, userdata, msg):
             
             # Set velocity using SET_POSITION_TARGET_LOCAL_NED
             connection.mav.set_position_target_local_ned_send(
-                0,       # timestamp (ignored)
+                0,       # timestamp (ignorato)
                 connection.target_system,
                 connection.target_component,
-                mavutil.mavlink.MAV_FRAME_BODY_OFFSET_NED,  # coordinate frame relative to the drone
-                0b0000111111000111,  # type mask (only velocity enabled)
-                0, 0, 0,             # position x, y, z (ignored)
-                vx, vy, vz,          # velocity x, y, z in m/s
-                0, 0, 0,             # acceleration (ignored)
-                0, 0                 # yaw, yaw_rate (ignored)
+                mavutil.mavlink.MAV_FRAME_BODY_OFFSET_NED,  # coordinate frame relativo al drone
+                0b0000111111000111,  # type mask (solo velocità abilitate)
+                0, 0, 0,             # posizione x, y, z (ignorata)
+                vx, vy, vz,          # velocità x, y, z in m/s
+                0, 0, 0,             # accelerazione (ignorata)
+                0, 0                 # yaw, yaw_rate (ignorati)
             )
             logger.info(f"Sent velocity command: vx={vx}, vy={vy}, vz={vz}")
             

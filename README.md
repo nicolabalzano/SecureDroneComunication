@@ -136,6 +136,8 @@ Before running the scripts, review and update the configuration constants at the
     *   `Q`: Move up
     *   `E`: Move down
     *   `SPACE`: Stop (sends zero velocity command)
+    *   `P`: Move the dron to inserted coordinates
+    *   `R`: Move the drone to random coordinates
 *   **Flight Commands:**
     *   `C`: Takeoff (switches to GUIDED mode, arms, and takes off to 10 meters)
     *   `X`: Land (switches to LAND mode)

@@ -6,11 +6,12 @@ import sys
 import termios
 import tty
 import logging
+import random
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
-# Parametri MQTT
+# MQTT parameters
 BROKER = "127.0.0.1"
 PORT = 8883
 TOPIC_TELEMETRY = "drone/telemetry"
@@ -19,12 +20,24 @@ CERT_CA = "/etc/mosquitto/ca_certificates/ca.crt"
 CERT_FILE = "/etc/mosquitto/certs/client.crt"
 KEY_FILE = "/etc/mosquitto/certs/client.key"
 
-# Callback telemetria
+# Parameters for random positions
+MAX_DISTANCE = 50  # meters
+MIN_ALTITUDE = 10   # meters
+MAX_ALTITUDE = 30   # meters
+
+# Function to generate a random position
+def generate_random_position():
+    x = random.uniform(-MAX_DISTANCE, MAX_DISTANCE)
+    y = random.uniform(-MAX_DISTANCE, MAX_DISTANCE)
+    z = random.uniform(MIN_ALTITUDE, MAX_ALTITUDE)
+    return {"lat": x, "lon": y, "alt": z}
+
+# Telemetry callback
 def on_message(client, userdata, message):
     #logging.info(f"Telemetry received: {message.payload.decode()}")
     pass
 
-# Lettura tasti senza invio
+# Read keys without enter
 def getch():
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
@@ -35,14 +48,15 @@ def getch():
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
 
-# Thread gestione input tastiera
+# Keyboard input management thread
 def keyboard_loop(client):
-    logging.info("Drone control: WASD per movimento, Q/E su/giù, C takeoff, X land, SPAZIO per fermare.")
+    logging.info("Drone control: WASD for movement, Q/E up/down, C takeoff, X land, SPACE to stop.")
+    logging.info("G to enter manual coordinates, R to generate random position.")
     while True:
         key = getch().lower()
         cmd = {}
         
-        # Comandi di velocità per modalità GUIDED
+        # Speed commands for GUIDED mode
         meter_per_second = 5.0
         if key == 'w':
             cmd = {'velocity': {"vx": meter_per_second, "vy": 0.0, "vz": 0.0}} 
@@ -56,10 +70,10 @@ def keyboard_loop(client):
             cmd = {'velocity': {"vx": 0.0, "vy": 0.0, "vz": -meter_per_second/2}}
         elif key == 'e':
             cmd = {'velocity': {"vx": 0.0, "vy": 0.0, "vz": meter_per_second/2}}
-        elif key == ' ':  # Spazio per fermarsi
+        elif key == ' ':  # Space to stop
             cmd = {'velocity': {"vx": 0.0, "vy": 0.0, "vz": 0.0}}  # Stop
             
-        # Modalità e comandi esistenti
+        # Existing modes and commands
         elif key == 'c':
             cmd = {'mode': 'GUIDED', 'takeoff_alt': 10}
         elif key == 'm':
@@ -68,6 +82,25 @@ def keyboard_loop(client):
             cmd = {'mode': 'LOITER'}
         elif key == 'x':
             cmd = {'mode': 'LAND'}
+        elif key == 'h':
+            cmd = {'return_home': True}
+            logging.info("Return to home command")
+        # New commands for autonomous navigation
+        elif key == 'p':
+            try:
+                print("\nEnter destination coordinates")
+                lat = float(input("Latitude: "))
+                lon = float(input("Longitude: "))
+                alt = float(input("Altitude (m): "))
+                cmd = {'position': {"lat": lat, "lon": lon, "alt": alt}}
+                print("Sending position command...")
+            except ValueError:
+                logging.error("Invalid input. Use numeric values.")
+                continue
+        elif key == 'r':
+            random_pos = generate_random_position()
+            cmd = {'position': random_pos}
+            logging.info(f"Generated random position: {random_pos}")
         elif key == '.':
             exit(1)
         else:
@@ -89,14 +122,14 @@ client.on_message = on_message
 client.connect(BROKER, PORT, 60)
 client.subscribe(TOPIC_TELEMETRY)
 client.loop_start()
-logging.info(f"Ground Station connessa, sottoscritto a {TOPIC_TELEMETRY}")
+logging.info(f"Ground Station connected, subscribed to {TOPIC_TELEMETRY}")
 
-# Avvia thread tastiera
+# Start keyboard thread
 keyboard_thread = threading.Thread(target=keyboard_loop, args=(client,))
 keyboard_thread.daemon = True
 keyboard_thread.start()
 
-# Mantieni in vita
+# Keep alive
 try:
     while True:
         pass

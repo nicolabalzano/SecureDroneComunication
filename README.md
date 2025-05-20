@@ -124,9 +124,8 @@ Before running the scripts, review and update the configuration constants at the
     ```
     The terminal will display the available keyboard controls.
 
-<video width="640" height="360" controls>
-<source src="./drone_simulation_compressed.mp4" type="video/mp4">
-</video>
+[Drone simulation working](./drone_simulation_compressed.mp4)
+
 
 ### Ground Station Keyboard Controls
 

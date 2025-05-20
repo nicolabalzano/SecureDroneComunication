@@ -124,7 +124,7 @@ Before running the scripts, review and update the configuration constants at the
     ```
     The terminal will display the available keyboard controls.
 
-(https://github.com/user-attachments/assets/124ba0d3-c264-40d6-a0de-d2925c4f8cd7)
+https://github.com/user-attachments/assets/124ba0d3-c264-40d6-a0de-d2925c4f8cd7
 
 ### Ground Station Keyboard Controls
 

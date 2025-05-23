@@ -5,17 +5,64 @@ import json
 import logging
 import time
 import threading
+import argparse
+import os
+import datetime
+import uuid
+from timing_logger import TimingLogger
 
-# Setup logging with more details
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description='Drone MQTT bridge')
+parser.add_argument('--no-tls', action='store_true', help='Disable TLS encryption')
+args = parser.parse_args()
+
+# Create logs directory if it doesn't exist
+LOG_DIR = "logs"
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+# Setup logging for application
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
+# Setup timing logger to capture message transit times
+current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+timing_log_filename = f"{LOG_DIR}/mqtt_timing_{current_date}.log"
+
+# Configure timing logger
+timing_logger = logging.getLogger("mqtt_timing")
+timing_logger.setLevel(logging.INFO)
+
+# Add file handler for timing log (only add if handler doesn't exist)
+if not any(isinstance(handler, logging.FileHandler) and 
+           handler.baseFilename == os.path.abspath(timing_log_filename) 
+           for handler in timing_logger.handlers):
+    timing_file_handler = logging.FileHandler(timing_log_filename)
+    timing_formatter = logging.Formatter('%(asctime)s - %(message)s')
+    timing_file_handler.setFormatter(timing_formatter)
+    timing_logger.addHandler(timing_file_handler)
+    
+    # Add console handler for timing log (optional)
+    timing_console_handler = logging.StreamHandler()
+    timing_console_handler.setFormatter(timing_formatter)
+    timing_logger.addHandler(timing_console_handler)
+
+# Dictionary to store message send times
+message_times = {}
+
+# TLS Configuration - can be disabled via command-line
+USE_TLS = not args.no_tls
+logger.info(f"TLS encryption: {'Enabled' if USE_TLS else 'Disabled'}")
+timing_logger.info(f"Drone MQTT started - TLS: {'Enabled' if USE_TLS else 'Disabled'}")
+
 # MQTT Configuration
 BROKER = "localhost"
-PORT = 8883
+PORT_TLS = 8883
+PORT_NO_TLS = 1883  # Standard MQTT port without TLS
+PORT = PORT_TLS if USE_TLS else PORT_NO_TLS
 TOPIC_TELEMETRY = "drone/telemetry"
 TOPIC_COMMAND = "drone/command"
 CERT_CA = "/etc/mosquitto/ca_certificates/ca.crt"
@@ -104,8 +151,36 @@ def on_connect(client, userdata, flags, rc):
 def on_command(client, userdata, msg):
     """Handle commands received from ground station via MQTT"""
     try:
+        # Record receive time immediately
+        receive_time = time.time()
+        
         logger.info(f"Received command: {msg.payload}")
         command = json.loads(msg.payload.decode())
+        
+        # Extract message ID for timing if present
+        message_id = command.get('message_id')
+        
+        # Try to determine message type
+        message_type = "unknown"
+        if 'mode' in command:
+            message_type = f"mode_{command['mode']}"
+        elif 'velocity' in command:
+            message_type = "velocity"
+        elif 'position' in command:
+            message_type = "position"
+        elif 'rc_override' in command:
+            message_type = "rc_override"
+        elif 'takeoff_alt' in command:
+            message_type = "takeoff"
+        elif 'arm' in command:
+            message_type = "arm"
+        
+        # Log receive time if message has ID
+        if message_id:
+            timing_logger.info(f"DRONE-RECV: Message ID {message_id} type {message_type} received at {receive_time:.6f}")
+            
+            # Process start time
+            process_start = time.time()
         
         if not connection:
             logger.error("Cannot process command - no MAVLink connection")
@@ -310,24 +385,39 @@ def on_command(client, userdata, msg):
             )
             logger.info(f"Sent velocity command: vx={vx}, vy={vy}, vz={vz}")
             
+        # Log execution completion and timing if message has ID
+        if message_id:
+            execute_time = time.time()
+            processing_time_ms = (execute_time - process_start) * 1000
+            transit_time_ms = (receive_time - message_times.get(message_id, receive_time)) * 1000 if message_id in message_times else 0
+            total_time_ms = (execute_time - message_times.get(message_id, receive_time)) * 1000 if message_id in message_times else processing_time_ms
+            
+            timing_logger.info(f"DRONE-EXEC: Message ID {message_id} type {message_type} executed - "
+                            f"Transit: {transit_time_ms:.2f}ms, Processing: {processing_time_ms:.2f}ms, "
+                            f"Total: {total_time_ms:.2f}ms, TLS: {USE_TLS}")
+            
     except json.JSONDecodeError:
         logger.error("Invalid JSON in command payload")
     except Exception as e:
         logger.error(f"Error processing command: {str(e)}")
 
 def setup_mqtt():
-    """Set up MQTT client with TLS security"""
+    """Set up MQTT client with optional TLS security"""
     try:
         client = mqtt.Client()
         client.on_connect = on_connect
         client.on_message = on_command
         
-        client.tls_set(
-            ca_certs=CERT_CA,
-            certfile=CERT_FILE,
-            keyfile=KEY_FILE,
-            tls_version=ssl.PROTOCOL_TLSv1_2
-        )
+        if USE_TLS:
+            logger.info("Configuring MQTT with TLS security")
+            client.tls_set(
+                ca_certs=CERT_CA,
+                certfile=CERT_FILE,
+                keyfile=KEY_FILE,
+                tls_version=ssl.PROTOCOL_TLSv1_2
+            )
+        else:
+            logger.info("Configuring MQTT without TLS security")
         
         client.connect(BROKER, PORT, 60)
         client.loop_start()
@@ -380,9 +470,15 @@ def telemetry_loop():
                 alt = msg.alt / 1000.0  # Convert to meters
                 relative_alt = msg.relative_alt / 1000.0
                 
+                # Add message ID for timing tracking
+                message_id = str(uuid.uuid4())
+                send_time = time.time()
+                message_times[message_id] = send_time
+                
                 payload = json.dumps({
                     'type': 'position',
                     'timestamp': int(time.time() * 1000),
+                    'message_id': message_id,
                     'lat': lat,
                     'lon': lon,
                     'alt': alt,
@@ -392,6 +488,9 @@ def telemetry_loop():
                     'vy': msg.vy / 100.0,
                     'vz': msg.vz / 100.0
                 })
+                
+                # Log send timing info
+                timing_logger.info(f"DRONE-SEND: Message ID {message_id} type position sent at {send_time:.6f}")
                 
                 mqtt_client.publish(TOPIC_TELEMETRY, payload)
                 logger.debug(f"Published position: lat={lat:.6f}, lon={lon:.6f}, alt={alt:.1f}m")
@@ -409,9 +508,15 @@ def telemetry_loop():
                 pitch = msg.pitch * 57.2958
                 yaw = msg.yaw * 57.2958
                 
+                # Add message ID for timing tracking
+                message_id = str(uuid.uuid4())
+                send_time = time.time()
+                message_times[message_id] = send_time
+                
                 payload = json.dumps({
                     'type': 'attitude',
                     'timestamp': int(time.time() * 1000),
+                    'message_id': message_id,
                     'roll': roll,
                     'pitch': pitch,
                     'yaw': yaw,
@@ -419,6 +524,9 @@ def telemetry_loop():
                     'pitchspeed': msg.pitchspeed,
                     'yawspeed': msg.yawspeed
                 })
+                
+                # Log send timing info
+                timing_logger.info(f"DRONE-SEND: Message ID {message_id} type attitude sent at {send_time:.6f}")
                 
                 mqtt_client.publish(TOPIC_TELEMETRY, payload)
                 logger.debug(f"Published attitude: roll={roll:.1f}, pitch={pitch:.1f}, yaw={yaw:.1f}")

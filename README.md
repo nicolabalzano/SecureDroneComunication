@@ -76,6 +76,10 @@ The system consists of two main Python scripts:
     keyfile /path/to/your/server.key
     require_certificate true
     tls_version tlsv1.2
+
+    # for no-tls connection demostration, please deleted it if you use it on your drone
+    listener 1883
+    allow_anonymous true
     ```
 *   Ensure the certificate paths defined in `drone_mqtt.py` and `ground_station.py` (constants `CERT_CA`, `CERT_FILE`, `KEY_FILE`) point to the correct client certificate files. The current default paths are `/etc/mosquitto/...`.
 
@@ -124,6 +128,9 @@ Before running the scripts, review and update the configuration constants at the
     ```
     The terminal will display the available keyboard controls.
 
+> [!TIP]
+> Use the parameter `--no-tls` in either the file to startup the connection to MQTT without use TLS.
+
 https://github.com/user-attachments/assets/124ba0d3-c264-40d6-a0de-d2925c4f8cd7
 
 ### Ground Station Keyboard Controls
@@ -147,6 +154,8 @@ https://github.com/user-attachments/assets/124ba0d3-c264-40d6-a0de-d2925c4f8cd7
     *   `H`: Swith to RTL mode
 *   **Other:**
     *   `.`: Exit the ground station script.
+    *   `+`: Increase the velocity for GUIDED mode
+    *   `-`: Decrease the velocity for GUIDED mode
 
 ## Security
 

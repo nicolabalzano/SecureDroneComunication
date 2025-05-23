@@ -210,8 +210,9 @@ def keyboard_loop(client):
             continue
 
         # Add unique message ID for timing tracking
-        message_id = str(uuid.uuid4())
+        message_id = str(cmd)
         cmd['message_id'] = message_id
+        #cmd['message_id'] = message_id
         
         # Log send time
         send_time = time.time()

@@ -1,0 +1,41 @@
+2025-05-23 12:49:25,914 - Drone MQTT started - TLS: Disabled
+2025-05-23 12:51:18,036 - Ground Station started - TLS: Disabled
+2025-05-23 12:51:18,207 - Drone MQTT started - TLS: Disabled
+
+2025-05-23 12:52:41,933 - GS-SEND: Message ID {'mode': 'GUIDED', 'takeoff_alt': 10} type mode_GUIDED sent at 1747997561.928767
+2025-05-23 12:52:41,939 - DRONE-RECV: Message ID {'mode': 'GUIDED', 'takeoff_alt': 10} type mode_GUIDED received at 1747997561.939409
+2025-05-23 12:52:43,939 - DRONE-EXEC: Message ID {'mode': 'GUIDED', 'takeoff_alt': 10} type mode_GUIDED executed - Transit: 0.00ms, Processing: 2000.43ms, Total: 2000.43ms, TLS: False
+
+2025-05-23 12:52:56,348 - GS-SEND: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity sent at 1747997576.348129
+2025-05-23 12:52:56,353 - DRONE-RECV: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity received at 1747997576.353627
+2025-05-23 12:52:56,353 - DRONE-EXEC: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity executed - Transit: 0.00ms, Processing: 0.06ms, Total: 0.06ms, TLS: False
+
+2025-05-23 12:52:57,074 - GS-SEND: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity sent at 1747997577.069638
+2025-05-23 12:52:57,085 - DRONE-RECV: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity received at 1747997577.085415
+2025-05-23 12:52:57,085 - DRONE-EXEC: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity executed - Transit: 0.00ms, Processing: 0.07ms, Total: 0.07ms, TLS: False
+
+2025-05-23 12:52:57,405 - GS-SEND: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity sent at 1747997577.400088
+2025-05-23 12:52:57,410 - DRONE-RECV: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity received at 1747997577.410854
+2025-05-23 12:52:57,411 - DRONE-EXEC: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity executed - Transit: 0.00ms, Processing: 0.09ms, Total: 0.09ms, TLS: False
+
+2025-05-23 12:53:21,489 - Ground Station started - TLS: Enabled
+2025-05-23 12:53:21,616 - Drone MQTT started - TLS: Enabled
+
+2025-05-23 12:54:10,789 - DRONE-RECV: Message ID {'mode': 'GUIDED', 'takeoff_alt': 10} type mode_GUIDED received at 1747997650.789717
+2025-05-23 12:54:10,799 - GS-SEND: Message ID {'mode': 'GUIDED', 'takeoff_alt': 10} type mode_GUIDED sent at 1747997650.784051
+2025-05-23 12:54:12,790 - DRONE-EXEC: Message ID {'mode': 'GUIDED', 'takeoff_alt': 10} type mode_GUIDED executed - Transit: 0.00ms, Processing: 2000.60ms, Total: 2000.60ms, TLS: True
+
+2025-05-23 12:54:21,108 - GS-SEND: Message ID {'velocity': {'vx': 0.0, 'vy': 0.0, 'vz': -2.5}} type velocity sent at 1747997661.103492
+2025-05-23 12:54:21,114 - DRONE-RECV: Message ID {'velocity': {'vx': 0.0, 'vy': 0.0, 'vz': -2.5}} type velocity received at 1747997661.114075
+2025-05-23 12:54:21,114 - DRONE-EXEC: Message ID {'velocity': {'vx': 0.0, 'vy': 0.0, 'vz': -2.5}} type velocity executed - Transit: 0.00ms, Processing: 0.07ms, Total: 0.07ms, TLS: True
+
+2025-05-23 12:54:30,772 - GS-SEND: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity sent at 1747997670.766777
+2025-05-23 12:54:30,772 - DRONE-RECV: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity received at 1747997670.772236
+2025-05-23 12:54:30,772 - DRONE-EXEC: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity executed - Transit: 0.00ms, Processing: 0.07ms, Total: 0.07ms, TLS: True
+
+2025-05-23 12:54:31,257 - GS-SEND: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity sent at 1747997671.257504
+2025-05-23 12:54:31,263 - DRONE-RECV: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity received at 1747997671.262942
+2025-05-23 12:54:31,263 - DRONE-EXEC: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity executed - Transit: 0.00ms, Processing: 0.07ms, Total: 0.07ms, TLS: True
+2025-05-23 12:54:31,693 - DRONE-RECV: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity received at 1747997671.693016
+2025-05-23 12:54:31,693 - DRONE-EXEC: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity executed - Transit: 0.00ms, Processing: 0.06ms, Total: 0.06ms, TLS: True
+2025-05-23 12:54:31,698 - GS-SEND: Message ID {'velocity': {'vx': 5.0, 'vy': 0.0, 'vz': 0.0}} type velocity sent at 1747997671.687700

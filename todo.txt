@@ -1,0 +1,5 @@
+Controlla il logger probabilmente la ground station non stampa nello stesso log
+
+Scrivere uno script automatico che fa 5 volte destra, 5 sinistra ecc e stampa i logo per creare un grafico (tempo comandi con le due curve)
+
+Cercare aziende che implementaiton sistemi di sicurezza

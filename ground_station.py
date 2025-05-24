@@ -9,13 +9,14 @@ import logging
 import random
 import time
 import argparse
-import uuid
 import os
 from datetime import datetime
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Ground station MQTT client')
 parser.add_argument('--no-tls', action='store_true', help='Disable TLS encryption')
+parser.add_argument('--automated', action='store_true', help='Run in automated mode')
+parser.add_argument('--test-time-encryption', action='store_true', help='Run automated test for encryption timing analysis')
 args = parser.parse_args()
 
 # Create logs directory if it doesn't exist
@@ -28,11 +29,16 @@ logging.basicConfig(level=logging.INFO)
 
 # Setup timing logger to capture message transit times
 current_date = datetime.now().strftime("%Y-%m-%d")
-timing_log_filename = f"{LOG_DIR}/mqtt_timing_{current_date}.log"
+tls_suffix = "with_tls" if not args.no_tls else "no_tls"
+timing_log_filename = f"{LOG_DIR}/mqtt_timing_{current_date}_{tls_suffix}.log"
 
 # Configure timing logger
 timing_logger = logging.getLogger("mqtt_timing")
 timing_logger.setLevel(logging.INFO)
+timing_logger.propagate = False  # Prevent propagation to root logger
+
+# Clear any existing handlers to avoid duplicates
+timing_logger.handlers.clear()
 
 # Add file handler for timing log
 timing_file_handler = logging.FileHandler(timing_log_filename)
@@ -40,18 +46,18 @@ timing_formatter = logging.Formatter('%(asctime)s - %(message)s')
 timing_file_handler.setFormatter(timing_formatter)
 timing_logger.addHandler(timing_file_handler)
 
-# Add console handler for timing log (optional)
-timing_console_handler = logging.StreamHandler()
-timing_console_handler.setFormatter(timing_formatter)
-timing_logger.addHandler(timing_console_handler)
-
 # Dictionary to store message send times
 message_times = {}
 
 # TLS Configuration - can be disabled via command-line
 USE_TLS = not args.no_tls
+AUTOMATED_MODE = args.automated or args.test_time_encryption
+TEST_TIME_ENCRYPTION = args.test_time_encryption
 logging.info(f"TLS encryption: {'Enabled' if USE_TLS else 'Disabled'}")
-timing_logger.info(f"Ground Station started - TLS: {'Enabled' if USE_TLS else 'Disabled'}")
+logging.info(f"Automated mode: {'Enabled' if AUTOMATED_MODE else 'Disabled'}")
+if TEST_TIME_ENCRYPTION:
+    logging.info("Test time encryption mode: Enabled")
+timing_logger.info(f"Ground Station started - TLS: {'Enabled' if USE_TLS else 'Disabled'} - Automated: {'Enabled' if AUTOMATED_MODE else 'Disabled'} - Test: {'Enabled' if TEST_TIME_ENCRYPTION else 'Disabled'}")
 
 # MQTT parameters
 BROKER = "127.0.0.1"
@@ -76,6 +82,105 @@ relative_altitude = 0.0
 vertical_movement = False
 # Flag to control altitude monitoring thread
 altitude_monitoring = False
+
+def automated_sequence(client):
+    global vertical_movement, altitude_monitoring, current_altitude, relative_altitude
+    logging.info("Starting automated sequence...")
+    meter_per_second = 5.0
+    
+    # Wait 2 minutes (120 seconds)
+    logging.info("Waiting 1 minutes before starting sequence...")
+    time.sleep(60)
+    
+    # Press C 1 times (move down)
+    logging.info("Executing C command (GUIDED mode)")
+    cmd = {'mode': 'GUIDED', 'takeoff_alt': 10}
+    vertical_movement = True
+    send_command(client, cmd, f"mode_{cmd['mode']}")
+    
+    # Wait 10 seconds
+    logging.info("Waiting 30 seconds...")
+    time.sleep(30)
+
+    # Press Q 2 times (move down)
+    logging.info("Executing Q command 2 times (move down)")
+    for i in range(2):
+        cmd = {'velocity': {"vx": 0.0, "vy": 0.0, "vz": -meter_per_second/2}}
+        vertical_movement = True
+        send_command(client, cmd, "velocity_down")
+        logging.info(f"Q command {i+1}/2 - Moving down from altitude - absolute: {current_altitude:.1f}m, relative: {relative_altitude:.1f}m")
+        time.sleep(1)  # Small delay between commands
+    
+    # Wait 10 seconds
+    logging.info("Waiting 10 seconds...")
+    time.sleep(10)
+    
+    # Press W 10 times (move forward)
+    logging.info("Executing W command 10 times (move forward)")
+    for i in range(10):
+        cmd = {'velocity': {"vx": meter_per_second, "vy": 0.0, "vz": 0.0}}
+        send_command(client, cmd, "velocity_forward")
+        logging.info(f"W command {i+1}/10")
+        time.sleep(1)
+    
+    # Wait 10 seconds
+    logging.info("Waiting 10 seconds...")
+    time.sleep(10)
+    
+    # Press D 10 times (move right)
+    logging.info("Executing D command 10 times (move right)")
+    for i in range(10):
+        cmd = {'velocity': {"vx": 0.0, "vy": meter_per_second, "vz": 0.0}}
+        send_command(client, cmd, "velocity_right")
+        logging.info(f"D command {i+1}/10")
+        time.sleep(1)
+    
+    # Wait 10 seconds
+    logging.info("Waiting 10 seconds...")
+    time.sleep(10)
+    
+    # Press S (move backward)
+    logging.info("Executing S command (move backward)")
+    cmd = {'velocity': {"vx": -meter_per_second, "vy": 0.0, "vz": 0.0}}
+    send_command(client, cmd, "velocity_backward")
+    
+    # Wait 10 seconds
+    logging.info("Waiting 10 seconds...")
+    time.sleep(10)
+    
+    # Press W 25 times (move forward)
+    logging.info("Executing W command 25 times (move forward)")
+    for i in range(25):
+        cmd = {'velocity': {"vx": meter_per_second, "vy": 0.0, "vz": 0.0}}
+        send_command(client, cmd, "velocity_forward")
+        logging.info(f"W command {i+1}/25")
+        time.sleep(1)
+    
+    # Press space (stop)
+    logging.info("Executing SPACE command (stop)")
+    cmd = {'velocity': {"vx": 0.0, "vy": 0.0, "vz": 0.0}}
+    vertical_movement = False
+    send_command(client, cmd, "velocity_stop")
+    
+    # Terminate program
+    logging.info("Automated sequence completed. Terminating program...")
+    altitude_monitoring = False
+    client.loop_stop()
+    sys.exit(0)
+    
+def send_command(client, cmd, command_type="unknown"):
+    global message_times, timing_logger, TOPIC_COMMAND
+    message_id = str(cmd)
+    cmd['message_id'] = message_id
+    
+    send_time = time.time()
+    message_times[message_id] = send_time
+    
+    payload = json.dumps(cmd)
+    client.publish(TOPIC_COMMAND, payload)
+    
+    timing_logger.info(f"GS-SEND: Message ID {message_id} type {command_type} sent at {send_time:.6f}")
+
 
 # Function to generate a random position
 def generate_random_position():
@@ -130,10 +235,18 @@ def monitor_altitude():
                 previous_alt = current_altitude
                 previous_rel_alt = relative_altitude
         time.sleep(0.5)
+# Automated sequence function
+
 
 # Keyboard input management thread
 def keyboard_loop(client):
     global vertical_movement, altitude_monitoring
+    
+    # Check if automated mode is enabled
+    if AUTOMATED_MODE:
+        automated_sequence(client)
+        return
+    
     logging.info("Drone control: WASD for movement, Q/E up/down, C takeoff, X land, SPACE to stop.")
     logging.info("G to enter manual coordinates, R to generate random position.")
     meter_per_second = 5.0
@@ -209,16 +322,7 @@ def keyboard_loop(client):
         else:
             continue
 
-        # Add unique message ID for timing tracking
-        message_id = str(cmd)
-        cmd['message_id'] = message_id
-        #cmd['message_id'] = message_id
-        
-        # Log send time
-        send_time = time.time()
-        message_times[message_id] = send_time
-        
-        # Determine message type for logging
+        # Send command using the new function
         message_type = "unknown"
         if 'velocity' in cmd:
             message_type = "velocity"
@@ -229,12 +333,7 @@ def keyboard_loop(client):
         elif 'takeoff_alt' in cmd:
             message_type = "takeoff"
         
-        payload = json.dumps(cmd)
-        client.publish(TOPIC_COMMAND, payload)
-        
-        # Log the timing information
-        timing_logger.info(f"GS-SEND: Message ID {message_id} type {message_type} sent at {send_time:.6f}")
-        logging.info(f"Sent command: {payload}")
+        send_command(client, cmd, message_type)
 
 # Setup MQTT
 client = mqtt.Client()

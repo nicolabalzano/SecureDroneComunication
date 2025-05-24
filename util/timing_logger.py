@@ -31,17 +31,16 @@ class TimingLogger:
         # Configure logger
         self.logger = logging.getLogger("mqtt_timing")
         self.logger.setLevel(logging.INFO)
+        self.logger.propagate = False  # Prevent propagation to root logger
+        
+        # Clear any existing handlers to avoid duplicates
+        self.logger.handlers.clear()
         
         # Add file handler for log
         file_handler = logging.FileHandler(self.log_filename)
         formatter = logging.Formatter('%(asctime)s - %(message)s')
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
-        
-        # Add console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler)
         
         self.message_times = {}
         self._initialized = True

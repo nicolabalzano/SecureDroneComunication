@@ -118,18 +118,17 @@ Before running the scripts, review and update the configuration constants at the
 
 ## Usage
 
+1. Make `run_drone.sh` executable:
+    ```bash
+    chmod +x ./run_drone.sh
+    ```
 1.  Run the `run_drone.sh` that startup ArduCopter drone simulator and the MQTT broker
     ```bash
     ./run_drone.sh
     ```
-4.  **Run `ground_station.py`** on your remote control computer:
-    ```bash
-    python ground_station.py
-    ```
-    The terminal will display the available keyboard controls.
-
+    
 > [!TIP]
-> Use the parameter `--no-tls` in either the file to startup the connection to MQTT without use TLS.
+> Use the parameter `--no-tls` to startup the connection to MQTT without use TLS. Use the parameter `--test-time-encryption` to register for each messaged send and recived.
 
 https://github.com/user-attachments/assets/124ba0d3-c264-40d6-a0de-d2925c4f8cd7
 

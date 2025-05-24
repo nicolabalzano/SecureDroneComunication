@@ -8,12 +8,12 @@ import threading
 import argparse
 import os
 import datetime
-import uuid
-from timing_logger import TimingLogger
+from util.timing_logger import TimingLogger
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Drone MQTT bridge')
 parser.add_argument('--no-tls', action='store_true', help='Disable TLS encryption')
+parser.add_argument('--test-time-encryption', action='store_true', help='Run automated test for encryption timing analysis')
 args = parser.parse_args()
 
 # Create logs directory if it doesn't exist
@@ -30,33 +30,37 @@ logger = logging.getLogger(__name__)
 
 # Setup timing logger to capture message transit times
 current_date = datetime.datetime.now().strftime("%Y-%m-%d")
-timing_log_filename = f"{LOG_DIR}/mqtt_timing_{current_date}.log"
+tls_suffix = "with_tls" if not args.no_tls else "no_tls"
+timing_log_filename = f"{LOG_DIR}/mqtt_timing_{current_date}_{tls_suffix}.log"
 
 # Configure timing logger
 timing_logger = logging.getLogger("mqtt_timing")
 timing_logger.setLevel(logging.INFO)
+timing_logger.propagate = False  # Prevent propagation to root logger
 
-# Add file handler for timing log (only add if handler doesn't exist)
-if not any(isinstance(handler, logging.FileHandler) and 
-           handler.baseFilename == os.path.abspath(timing_log_filename) 
-           for handler in timing_logger.handlers):
-    timing_file_handler = logging.FileHandler(timing_log_filename)
-    timing_formatter = logging.Formatter('%(asctime)s - %(message)s')
-    timing_file_handler.setFormatter(timing_formatter)
-    timing_logger.addHandler(timing_file_handler)
-    
-    # Add console handler for timing log (optional)
-    timing_console_handler = logging.StreamHandler()
-    timing_console_handler.setFormatter(timing_formatter)
-    timing_logger.addHandler(timing_console_handler)
+# Clear any existing handlers to avoid duplicates  
+timing_logger.handlers.clear()
+
+# Add file handler for timing log
+timing_file_handler = logging.FileHandler(timing_log_filename)
+timing_formatter = logging.Formatter('%(asctime)s - %(message)s')
+timing_file_handler.setFormatter(timing_formatter)
+timing_logger.addHandler(timing_file_handler)
 
 # Dictionary to store message send times
 message_times = {}
 
+# Add global flags for termination control
+first_command_executed = False
+should_terminate = False
+
 # TLS Configuration - can be disabled via command-line
 USE_TLS = not args.no_tls
+TEST_TIME_ENCRYPTION = args.test_time_encryption
 logger.info(f"TLS encryption: {'Enabled' if USE_TLS else 'Disabled'}")
-timing_logger.info(f"Drone MQTT started - TLS: {'Enabled' if USE_TLS else 'Disabled'}")
+if TEST_TIME_ENCRYPTION:
+    logger.info("Test time encryption mode: Enabled")
+timing_logger.info(f"Drone MQTT started - TLS: {'Enabled' if USE_TLS else 'Disabled'} - Test: {'Enabled' if TEST_TIME_ENCRYPTION else 'Disabled'}")
 
 # MQTT Configuration
 BROKER = "localhost"
@@ -150,12 +154,25 @@ def on_connect(client, userdata, flags, rc):
 
 def on_command(client, userdata, msg):
     """Handle commands received from ground station via MQTT"""
+    global first_command_executed, should_terminate, TEST_TIME_ENCRYPTION
+    
     try:
         # Record receive time immediately
         receive_time = time.time()
         
         logger.info(f"Received command: {msg.payload}")
         command = json.loads(msg.payload.decode())
+        
+        # Check for test termination command
+        if command.get('command') == '--test-time-encryption':
+            if first_command_executed:
+                logger.info("Test termination command received after first command execution. Terminating...")
+                timing_logger.info("DRONE-TERMINATE: Test completed, terminating drone_mqtt.py")
+                should_terminate = True
+                return
+            else:
+                logger.info("Test termination command received but no previous command executed yet. Ignoring...")
+                return
         
         # Extract message ID for timing if present
         message_id = command.get('message_id')
@@ -186,6 +203,9 @@ def on_command(client, userdata, msg):
             logger.error("Cannot process command - no MAVLink connection")
             return
         
+        # Mark that we've executed our first command (before processing any actual commands)
+        command_executed = False
+        
         # RC override command
         if 'rc_override' in command:
             overrides = command['rc_override']
@@ -196,6 +216,7 @@ def on_command(client, userdata, msg):
                 *channels
             )
             logger.info(f"Sent RC_OVERRIDE: {channels}")
+            command_executed = True
         
         # Mode change command
         if 'mode' in command:
@@ -229,6 +250,7 @@ def on_command(client, userdata, msg):
                     logger.info(f"Setting flight mode to ID {mode_id}")
                 except ValueError:
                     logger.error(f"Unknown flight mode: {mode}")
+            command_executed = True
         
         # Arm/disarm command
         if 'arm' in command:
@@ -241,6 +263,7 @@ def on_command(client, userdata, msg):
                 arm, 0, 0, 0, 0, 0, 0
             )
             logger.info(f"{'Arming' if arm else 'Disarming'} vehicle")
+            command_executed = True
         
         # Takeoff command
         if 'takeoff_alt' in command:
@@ -273,6 +296,7 @@ def on_command(client, userdata, msg):
                 0, 0, 0, 0, 0, 0, alt
             )
             logger.info(f"Takeoff command sent - target altitude: {alt}m")
+            command_executed = True
         
         # Position command (new format with position object)
         if 'position' in command:
@@ -328,6 +352,7 @@ def on_command(client, userdata, msg):
                 )
                 
                 logger.info(f"Sent position command: lat={lat}, lon={lon}, alt={alt}")
+                command_executed = True
             else:
                 logger.error("Incomplete position data in command")
         
@@ -363,6 +388,7 @@ def on_command(client, userdata, msg):
                 alt  # param7: alt
             )
             logger.info(f"Sent waypoint command: lat={lat}, lon={lon}, alt={alt}")
+            command_executed = True
         
         # Velocity command
         if 'velocity' in command:
@@ -384,6 +410,11 @@ def on_command(client, userdata, msg):
                 0, 0                 # yaw, yaw_rate (ignorati)
             )
             logger.info(f"Sent velocity command: vx={vx}, vy={vy}, vz={vz}")
+            command_executed = True
+        
+        # Update first command flag if any command was executed
+        if command_executed:
+            first_command_executed = True
             
         # Log execution completion and timing if message has ID
         if message_id:
@@ -395,6 +426,13 @@ def on_command(client, userdata, msg):
             timing_logger.info(f"DRONE-EXEC: Message ID {message_id} type {message_type} executed - "
                             f"Transit: {transit_time_ms:.2f}ms, Processing: {processing_time_ms:.2f}ms, "
                             f"Total: {total_time_ms:.2f}ms, TLS: {USE_TLS}")
+        
+        # In test mode, terminate after first command execution
+        if TEST_TIME_ENCRYPTION and command_executed and first_command_executed:
+            logger.info("Test mode: First command executed. Terminating drone_mqtt.py...")
+            timing_logger.info("DRONE-TERMINATE: Test completed after first command execution")
+            should_terminate = True
+            return
             
     except json.JSONDecodeError:
         logger.error("Invalid JSON in command payload")
@@ -428,12 +466,12 @@ def setup_mqtt():
 
 def telemetry_loop():
     """Main loop for receiving MAVLink messages and publishing telemetry"""
-    global connection
+    global connection, should_terminate
     
     last_pos_time = 0
     last_attitude_time = 0
     
-    while True:
+    while not should_terminate:
         try:
             if not connection:
                 logger.warning("No MAVLink connection, attempting to reconnect...")
@@ -447,6 +485,10 @@ def telemetry_loop():
             msg = connection.recv_match(blocking=True, timeout=1.0)
             if not msg:
                 continue
+                
+            # Check for termination flag
+            if should_terminate:
+                break
                 
             # Skip heartbeats and other common messages to reduce log noise
             if msg.get_type() == 'HEARTBEAT':
@@ -471,7 +513,7 @@ def telemetry_loop():
                 relative_alt = msg.relative_alt / 1000.0
                 
                 # Add message ID for timing tracking
-                message_id = str(uuid.uuid4())
+                message_id = 'GLOBAL_POSITION_INT'
                 send_time = time.time()
                 message_times[message_id] = send_time
                 
@@ -509,7 +551,7 @@ def telemetry_loop():
                 yaw = msg.yaw * 57.2958
                 
                 # Add message ID for timing tracking
-                message_id = str(uuid.uuid4())
+                message_id = 'ATTITUDE'
                 send_time = time.time()
                 message_times[message_id] = send_time
                 
@@ -537,6 +579,10 @@ def telemetry_loop():
         except Exception as e:
             logger.error(f"Error in telemetry loop: {str(e)}")
             time.sleep(1)
+    
+    # Log termination
+    if should_terminate:
+        logger.info("Telemetry loop terminated due to test completion")
 
 if __name__ == "__main__":
     logger.info("Starting MAVLink to MQTT bridge")
@@ -560,6 +606,10 @@ if __name__ == "__main__":
                     mqtt_client.loop_stop()
                     mqtt_client.disconnect()
                 logger.info("MQTT client disconnected")
+                
+                # Log final termination message
+                if should_terminate:
+                    timing_logger.info("DRONE-EXIT: drone_mqtt.py terminated successfully after test completion")
         else:
             logger.error("Failed to set up MQTT client. Exiting.")
     else:

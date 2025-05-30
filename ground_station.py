@@ -11,6 +11,7 @@ import time
 import argparse
 import os
 from datetime import datetime
+import uuid
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Ground station MQTT client')
@@ -170,7 +171,7 @@ def automated_sequence(client):
     
 def send_command(client, cmd, command_type="unknown"):
     global message_times, timing_logger, TOPIC_COMMAND
-    message_id = str(cmd)
+    message_id = str(uuid.uuid4())
     cmd['message_id'] = message_id
     
     send_time = time.time()

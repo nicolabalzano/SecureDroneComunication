@@ -8,6 +8,7 @@ import threading
 import argparse
 import os
 import datetime
+import uuid
 from util.timing_logger import TimingLogger
 
 # Parse command-line arguments
@@ -513,7 +514,7 @@ def telemetry_loop():
                 relative_alt = msg.relative_alt / 1000.0
                 
                 # Add message ID for timing tracking
-                message_id = 'GLOBAL_POSITION_INT'
+                message_id = str(uuid.uuid4())
                 send_time = time.time()
                 message_times[message_id] = send_time
                 
@@ -551,7 +552,7 @@ def telemetry_loop():
                 yaw = msg.yaw * 57.2958
                 
                 # Add message ID for timing tracking
-                message_id = 'ATTITUDE'
+                message_id = str(uuid.uuid4())
                 send_time = time.time()
                 message_times[message_id] = send_time
                 

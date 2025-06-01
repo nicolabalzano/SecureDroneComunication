@@ -4,17 +4,20 @@ import numpy as np
 import os # Added for path operations
 from datetime import datetime # Added for unique filenames
 
-LOG_FILE_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-05-30_with_tls.log"
-LOG_FILE_NO_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-05-30_no_tls.log"
+LOG_FILE_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-05-30_with_tls_1.log"
+LOG_FILE_NO_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-05-30_no_tls_1.log"
 ASSETS_DIR = "/home/nikba/DrivenDroneMQTT/assets/"
 
 def parse_log_file(filepath):
     """
     Parses a log file to extract message latencies.
-    Excludes any message that has a GS-SEND event (by UUID).
+    Returns two lists:
+      - latencies: normal message latencies (no GS-SEND)
+      - gs_send_latencies: tuples (index, latency) for GS-SEND messages
     """
     send_events = {}  # Stores {msg_id: timestamp}
     latencies = []
+    gs_send_latencies = []  # Store (index, latency) for GS-SEND events
     gs_send_ids = set()  # Store UUIDs of GS-SEND events
 
     # Regex to capture:
@@ -52,23 +55,22 @@ def parse_log_file(filepath):
                         send_events_recorded += 1
                     elif event_type.endswith("-RECV"):
                         if msg_id in send_events:
-                            # Exclude if this msg_id was a GS-SEND
-                            if msg_id in gs_send_ids:
-                                del send_events[msg_id]
-                                continue
                             send_time = send_events[msg_id]
                             latency_ms = (timestamp - send_time) * 1000  # Convert to milliseconds
-                            latencies.append(latency_ms)
+                            if msg_id in gs_send_ids:
+                                gs_send_latencies.append((len(latencies) + len(gs_send_latencies), latency_ms))
+                            else:
+                                latencies.append(latency_ms)
                             recv_events_found_pair += 1
                             del send_events[msg_id]
                         else:
                             recv_events_no_pair += 1
     except FileNotFoundError:
         print(f"Error: File not found at {filepath}")
-        return []
+        return [], []
     except Exception as e:
         print(f"An error occurred while parsing {filepath}: {e}")
-        return []
+        return [], []
     
     print(f"Finished parsing {filepath}:")
     print(f"  Lines processed: {lines_processed}")
@@ -80,8 +82,8 @@ def parse_log_file(filepath):
     if send_events:
         print(f"  Unmatched SEND events remaining: {len(send_events)}")
 
-    print(f"  Excluded {len(gs_send_ids)} GS-SEND message IDs from latency calculation.")
-    return latencies
+    print(f"  GS-SEND message IDs to be shown in green: {len(gs_send_latencies)}")
+    return latencies, gs_send_latencies
 
 def calculate_stats(latencies):
     """Calculates statistics for a list of latencies."""
@@ -98,8 +100,9 @@ def calculate_stats(latencies):
     }
 
 def plot_latencies(latencies_tls, label_tls, stats_tls,
-                   latencies_no_tls, label_no_tls, stats_no_tls):
-    """Plots the latencies and displays statistics."""
+                   latencies_no_tls, label_no_tls, stats_no_tls,
+                   gs_send_tls=None, gs_send_no_tls=None):
+    """Plots the latencies and displays statistics. Optionally highlights GS-SEND points in green."""
     plt.figure(figsize=(14, 8))
     
     ax = plt.gca() # Get current axes
@@ -107,10 +110,18 @@ def plot_latencies(latencies_tls, label_tls, stats_tls,
     if latencies_tls and stats_tls:
         x_tls = range(stats_tls['count'])
         plt.plot(x_tls, latencies_tls, label=f"{label_tls} (N={stats_tls['count']})", alpha=0.7, marker='o', linestyle='-', markersize=4)
+        # Plot GS-SEND points in green
+        if gs_send_tls:
+            for idx, latency in gs_send_tls:
+                plt.scatter(idx, latency, color='green', s=60, marker='o', label='GS-SEND (TLS)' if idx == gs_send_tls[0][0] else "")
 
     if latencies_no_tls and stats_no_tls:
         x_no_tls = range(stats_no_tls['count'])
         plt.plot(x_no_tls, latencies_no_tls, label=f"{label_no_tls} (N={stats_no_tls['count']})", alpha=0.7, marker='x', linestyle='--', markersize=4)
+        # Plot GS-SEND points in green
+        if gs_send_no_tls:
+            for idx, latency in gs_send_no_tls:
+                plt.scatter(idx, latency, color='green', s=60, marker='o', label='GS-SEND (No TLS)' if idx == gs_send_no_tls[0][0] else "")
 
     plt.xlabel("Message Sequence Index (Comandi)")
     plt.ylabel("Latency (ms)")
@@ -169,11 +180,11 @@ def plot_latencies(latencies_tls, label_tls, stats_tls,
 
 if __name__ == "__main__":
     print(f"Parsing TLS log file: {LOG_FILE_TLS}")
-    latencies_tls = parse_log_file(LOG_FILE_TLS)
+    latencies_tls, gs_send_tls = parse_log_file(LOG_FILE_TLS)
     print(f"Found {len(latencies_tls)} latencies with TLS.")
 
     print(f"Parsing No-TLS log file: {LOG_FILE_NO_TLS}")
-    latencies_no_tls = parse_log_file(LOG_FILE_NO_TLS)
+    latencies_no_tls, gs_send_no_tls = parse_log_file(LOG_FILE_NO_TLS)
     print(f"Found {len(latencies_no_tls)} latencies without TLS.")
 
     if latencies_tls and latencies_no_tls:
@@ -182,21 +193,22 @@ if __name__ == "__main__":
             print(f"\nAdjusting datasets to the same number of samples: {min_len}")
             latencies_tls = latencies_tls[:min_len]
             latencies_no_tls = latencies_no_tls[:min_len]
+            # Also adjust GS-SEND indices
+            gs_send_tls = [(idx, lat) for idx, lat in gs_send_tls if idx < min_len]
+            gs_send_no_tls = [(idx, lat) for idx, lat in gs_send_no_tls if idx < min_len]
             print(f"  New count for TLS latencies: {len(latencies_tls)}")
             print(f"  New count for No-TLS latencies: {len(latencies_no_tls)}")
         else:
             print(f"\nBoth datasets have the same number of samples: {len(latencies_tls)}")
 
-
     if not latencies_tls and not latencies_no_tls:
         print("No latency data could be extracted from the log files.")
-        # Call plot_latencies to show an empty graph with a message
-        plot_latencies([], "With TLS", None, [], "Without TLS", None)
+        plot_latencies([], "With TLS", None, [], "Without TLS", None, [], [])
     else:
         stats_tls_data = calculate_stats(latencies_tls)
         stats_no_tls_data = calculate_stats(latencies_no_tls)
-        
         plot_latencies(
             latencies_tls, "With TLS", stats_tls_data,
-            latencies_no_tls, "Without TLS", stats_no_tls_data
+            latencies_no_tls, "Without TLS", stats_no_tls_data,
+            gs_send_tls, gs_send_no_tls
         )

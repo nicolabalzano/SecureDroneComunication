@@ -17,6 +17,9 @@ parser.add_argument('--no-tls', action='store_true', help='Disable TLS encryptio
 parser.add_argument('--test-time-encryption', action='store_true', help='Run automated test for encryption timing analysis')
 args = parser.parse_args()
 
+# rate limit for telemetry messages (in seconds)
+RATE_LIMIT = 0.25
+
 # Create logs directory if it doesn't exist
 LOG_DIR = "logs"
 if not os.path.exists(LOG_DIR):
@@ -133,6 +136,18 @@ def request_data_streams():
         0, 0, 0, 0, 0
     )
     logger.info("Requested ATTITUDE at 5Hz")
+    
+    # Request battery status data
+    connection.mav.command_long_send(
+        connection.target_system,
+        connection.target_component,
+        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+        0,
+        mavutil.mavlink.MAVLINK_MSG_ID_BATTERY_STATUS,
+        1000000,  # 1 Hz (ogni secondo)
+        0, 0, 0, 0, 0
+    )
+    logger.info("Requested BATTERY_STATUS at 1Hz")
     
     # Alternative method using REQUEST_DATA_STREAM
     connection.mav.request_data_stream_send(
@@ -471,6 +486,7 @@ def telemetry_loop():
     
     last_pos_time = 0
     last_attitude_time = 0
+    last_battery_time = 0  # Aggiunto per rate limiting della batteria
     
     while not should_terminate:
         try:
@@ -503,7 +519,7 @@ def telemetry_loop():
             if msg.get_type() == 'GLOBAL_POSITION_INT':
                 # Rate limit to avoid flooding MQTT
                 current_time = time.time()
-                if current_time - last_pos_time < 0.5:  # max 2Hz publishing
+                if current_time - last_pos_time < RATE_LIMIT:
                     continue
                 last_pos_time = current_time
                 
@@ -542,7 +558,7 @@ def telemetry_loop():
             elif msg.get_type() == 'ATTITUDE':
                 # Rate limit
                 current_time = time.time()
-                if current_time - last_attitude_time < 0.5:
+                if current_time - last_attitude_time < RATE_LIMIT:
                     continue
                 last_attitude_time = current_time
                 
@@ -573,6 +589,40 @@ def telemetry_loop():
                 
                 mqtt_client.publish(TOPIC_TELEMETRY, payload)
                 logger.debug(f"Published attitude: roll={roll:.1f}, pitch={pitch:.1f}, yaw={yaw:.1f}")
+                
+            # Process BATTERY_STATUS messages
+            elif msg.get_type() == 'BATTERY_STATUS':
+                # Rate limit - battery info ogni 2 secondi
+                current_time = time.time()
+                if current_time - last_battery_time < RATE_LIMIT:
+                    continue
+                last_battery_time = current_time
+                
+                # Extract battery data
+                battery_remaining = msg.battery_remaining  # Percentage 0-100
+                voltage = msg.voltages[0] / 1000.0 if msg.voltages and msg.voltages[0] != 65535 else 0.0  # Convert mV to V
+                current = msg.current_battery / 100.0 if msg.current_battery != -1 else 0.0  # Convert cA to A
+                
+                # Add message ID for timing tracking
+                message_id = str(uuid.uuid4())
+                send_time = time.time()
+                message_times[message_id] = send_time
+                
+                payload = json.dumps({
+                    'type': 'battery',
+                    'timestamp': int(time.time() * 1000),
+                    'message_id': message_id,
+                    'battery_remaining': battery_remaining,
+                    'voltage': voltage,
+                    'current': current,
+                    'battery_id': msg.id
+                })
+                
+                # Log send timing info
+                timing_logger.info(f"DRONE-SEND: Message ID {message_id} type battery sent at {send_time:.6f}")
+                
+                mqtt_client.publish(TOPIC_TELEMETRY, payload)
+                logger.debug(f"Published battery: {battery_remaining}%, {voltage:.1f}V, {current:.1f}A")
                 
         except KeyboardInterrupt:
             logger.info("Telemetry loop stopped by user")

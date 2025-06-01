@@ -4,19 +4,19 @@ import numpy as np
 import os # Added for path operations
 from datetime import datetime # Added for unique filenames
 
-LOG_FILE_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-05-30_with_tls.log"
-LOG_FILE_NO_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-05-30_no_tls.log"
+LOG_FILE_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-05-30_with_tls_05s.log"
+LOG_FILE_NO_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-05-30_no_tls_05s.log"
 ASSETS_DIR = "/home/nikba/DrivenDroneMQTT/assets/"
 
 def parse_log_file(filepath):
     """
     Parses a log file to extract message latencies.
-    Excludes any message that has a GS-SEND event (by UUID).
+    A message is considered complete if a SEND event is followed by a RECV event
+    with the same message ID.
     """
     send_events = {}  # Stores {msg_id: timestamp}
     latencies = []
-    gs_send_ids = set()  # Store UUIDs of GS-SEND events
-
+    
     # Regex to capture:
     # Group 1: Event type (e.g., DRONE-SEND, GS-RECV)
     # Group 2: Message ID
@@ -42,27 +42,31 @@ def parse_log_file(filepath):
                     lines_matched_regex += 1
                     event_type, msg_id, timestamp_str = match.groups()
                     timestamp = float(timestamp_str)
-
-                    if event_type == "GS-SEND":
-                        gs_send_ids.add(msg_id)
-                        continue  # Don't store GS-SEND as a send event
+                    # Uncomment for very detailed logging:
+                    # print(f"  [DEBUG] Matched line {lines_processed}: ID={msg_id}, Type={event_type}, Time={timestamp}")
 
                     if event_type.endswith("-SEND"):
                         send_events[msg_id] = timestamp
                         send_events_recorded += 1
+                        # Uncomment for very detailed logging:
+                        # print(f"    [DEBUG] Stored SEND for ID {msg_id}")
                     elif event_type.endswith("-RECV"):
                         if msg_id in send_events:
-                            # Exclude if this msg_id was a GS-SEND
-                            if msg_id in gs_send_ids:
-                                del send_events[msg_id]
-                                continue
                             send_time = send_events[msg_id]
                             latency_ms = (timestamp - send_time) * 1000  # Convert to milliseconds
                             latencies.append(latency_ms)
                             recv_events_found_pair += 1
+                            # Uncomment for very detailed logging:
+                            # print(f"    [DEBUG] Calculated latency for ID {msg_id}: {latency_ms:.2f} ms")
                             del send_events[msg_id]
                         else:
-                            recv_events_no_pair += 1
+                            recv_events_no_pair +=1
+                            # Uncomment for very detailed logging:
+                            # print(f"    [DEBUG] RECV for ID {msg_id} found, but no prior SEND event stored or already used.")
+                # else:
+                    # Uncomment to see lines that do NOT match the regex:
+                    # if line.strip(): # Avoid printing for blank lines
+                    #     print(f"  [DEBUG] No match for line {lines_processed}: {line.strip()}")
     except FileNotFoundError:
         print(f"Error: File not found at {filepath}")
         return []
@@ -79,8 +83,9 @@ def parse_log_file(filepath):
     print(f"  Calculated latencies: {len(latencies)}")
     if send_events:
         print(f"  Unmatched SEND events remaining: {len(send_events)}")
+        # for msg_id_unmatched in list(send_events.keys())[:5]: # Print first 5 unmatched
+        #     print(f"    Example unmatched SEND ID: {msg_id_unmatched}")
 
-    print(f"  Excluded {len(gs_send_ids)} GS-SEND message IDs from latency calculation.")
     return latencies
 
 def calculate_stats(latencies):

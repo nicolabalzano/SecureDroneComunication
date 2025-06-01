@@ -79,6 +79,10 @@ MAX_ALTITUDE = 30   # meters
 # Global variable to store current drone altitude
 current_altitude = 0.0
 relative_altitude = 0.0
+# Global variables to store battery info
+battery_remaining = 100  # Percentage
+battery_voltage = 0.0    # Volts
+battery_current = 0.0    # Amperes
 # Flag to track vertical movement
 vertical_movement = False
 # Flag to control altitude monitoring thread
@@ -192,7 +196,7 @@ def generate_random_position():
 
 # Telemetry callback
 def on_message(client, userdata, message):
-    global current_altitude, relative_altitude
+    global current_altitude, relative_altitude, battery_remaining, battery_voltage, battery_current
     try:
         telemetry_data = json.loads(message.payload.decode())
         
@@ -203,9 +207,18 @@ def on_message(client, userdata, message):
             message_type = telemetry_data.get('type', 'unknown')
             timing_logger.info(f"GS-RECV: Message ID {message_id} type {message_type} received at {receive_time:.6f}")
         
+        # Update altitude data
         if 'alt' in telemetry_data:
             current_altitude = telemetry_data['alt']
             relative_altitude = telemetry_data['relative_alt']
+            
+        # Update battery data
+        if telemetry_data.get('type') == 'battery':
+            battery_remaining = telemetry_data.get('battery_remaining', 100)
+            battery_voltage = telemetry_data.get('voltage', 0.0)
+            battery_current = telemetry_data.get('current', 0.0)
+            logging.info(f"Battery update: {battery_remaining}%, {battery_voltage:.1f}V, {battery_current:.1f}A")
+            
     except Exception as e:
         logging.error(f"Error parsing telemetry data: {e}")
 
@@ -222,19 +235,44 @@ def getch():
 
 # Function to monitor and display altitude in real time
 def monitor_altitude():
-    global altitude_monitoring, vertical_movement
+    global altitude_monitoring, vertical_movement, battery_remaining, battery_voltage, battery_current
     altitude_monitoring = True
     previous_alt = current_altitude
     previous_rel_alt = relative_altitude
+    previous_battery = battery_remaining
     
     while altitude_monitoring:
+        # Display current status
+        status_changed = False
+        
         if vertical_movement:
             # Only log if altitude has changed significantly
             if abs(current_altitude - previous_alt) > 0.1 or abs(relative_altitude - previous_rel_alt) > 0.1:
-                print(f"\033[2K\rAltitude update - absolute: {current_altitude:.1f}m, relative: {relative_altitude:.1f}m", end='')
-                sys.stdout.flush()
+                status_changed = True
                 previous_alt = current_altitude
                 previous_rel_alt = relative_altitude
+        
+        # Always show battery status if it changed or if we're in vertical movement
+        if abs(battery_remaining - previous_battery) > 0.5 or vertical_movement or status_changed:
+            battery_color = ""
+            reset_color = "\033[0m"
+            
+            # Color coding for battery level
+            if battery_remaining > 50:
+                battery_color = "\033[32m"  # Green
+            elif battery_remaining > 20:
+                battery_color = "\033[33m"  # Yellow
+            else:
+                battery_color = "\033[31m"  # Red
+                
+            status_line = f"Altitude: {current_altitude:.1f}m (rel: {relative_altitude:.1f}m) | "
+            status_line += f"Battery: {battery_color}{battery_remaining:.0f}%{reset_color} "
+            status_line += f"({battery_voltage:.1f}V, {battery_current:.1f}A)"
+            
+            print(f"\033[2K\r{status_line}", end='')
+            sys.stdout.flush()
+            previous_battery = battery_remaining
+            
         time.sleep(0.5)
 # Automated sequence function
 
@@ -250,6 +288,8 @@ def keyboard_loop(client):
     
     logging.info("Drone control: WASD for movement, Q/E up/down, C takeoff, X land, SPACE to stop.")
     logging.info("G to enter manual coordinates, R to generate random position.")
+    logging.info("Battery status will be displayed in real-time (Green: >50%, Yellow: 20-50%, Red: <20%)")
+    logging.info("Press 'B' for detailed battery status, '.' to exit.")
     meter_per_second = 5.0
     
     # Start altitude monitoring thread
@@ -318,6 +358,24 @@ def keyboard_loop(client):
             random_pos = generate_random_position()
             cmd = {'position': random_pos}
             logging.info(f"Generated random position: {random_pos}")
+        elif key == 'b':
+            # Display detailed battery status
+            battery_color = ""
+            reset_color = "\033[0m"
+            
+            if battery_remaining > 50:
+                battery_color = "\033[32m"  # Green
+            elif battery_remaining > 20:
+                battery_color = "\033[33m"  # Yellow
+            else:
+                battery_color = "\033[31m"  # Red
+                
+            print(f"\n--- BATTERY STATUS ---")
+            print(f"Level: {battery_color}{battery_remaining:.1f}%{reset_color}")
+            print(f"Voltage: {battery_voltage:.2f}V")
+            print(f"Current: {battery_current:.2f}A")
+            print(f"---------------------\n")
+            continue
         elif key == '.':
             exit(1)
         else:

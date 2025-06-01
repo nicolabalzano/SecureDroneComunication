@@ -4,8 +4,8 @@ import numpy as np
 import os # Added for path operations
 from datetime import datetime # Added for unique filenames
 
-LOG_FILE_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-06-01_with_tls_025.log"
-LOG_FILE_NO_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-06-01_no_tls_025.log"
+LOG_FILE_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-06-01_with_tls_1.log"
+LOG_FILE_NO_TLS = "/home/nikba/DrivenDroneMQTT/logs/mqtt_timing_2025-06-01_no_tls_1.log"
 ASSETS_DIR = "/home/nikba/DrivenDroneMQTT/assets/"
 
 # Battery metrics - modify these values manually before running

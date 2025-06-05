@@ -18,7 +18,7 @@ parser.add_argument('--test-time-encryption', action='store_true', help='Run aut
 args = parser.parse_args()
 
 # rate limit for telemetry messages (in seconds)
-RATE_LIMIT = 1
+RATE_LIMIT = 0.5
 
 # Create logs directory if it doesn't exist
 LOG_DIR = "logs"

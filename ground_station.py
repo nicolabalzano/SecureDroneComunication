@@ -217,7 +217,7 @@ def on_message(client, userdata, message):
             battery_remaining = telemetry_data.get('battery_remaining', 100)
             battery_voltage = telemetry_data.get('voltage', 0.0)
             battery_current = telemetry_data.get('current', 0.0)
-            logging.info(f"Battery update: {battery_remaining}%, {battery_voltage:.1f}V, {battery_current:.1f}A")
+            #logging.info(f"Battery update: {battery_remaining}%, {battery_voltage:.1f}V, {battery_current:.1f}A")
             
     except Exception as e:
         logging.error(f"Error parsing telemetry data: {e}")

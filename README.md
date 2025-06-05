@@ -130,7 +130,7 @@ Before running the scripts, review and update the configuration constants at the
 > [!TIP]
 > Use the parameter `--no-tls` to startup the connection to MQTT without use TLS. Use the parameter `--test-time-encryption` to register for each messaged send and recived.
 
-https://github.com/user-attachments/assets/5962721f-c5d7-4aa7-b72d-829ca06cfe65
+https://github.com/user-attachments/assets/4c6a0d61-1a8c-4c8c-bb26-a5f6c32eeae4
 
 ### Ground Station Keyboard Controls
 

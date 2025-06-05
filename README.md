@@ -34,17 +34,17 @@ The system consists of two main Python scripts:
 ## Architecture
 
 ```
-+---------------------+      MAVLink       +-------------------+      MQTT (TLS)      +-----------------------+
-| Flight Controller   |<------------------>|  drone_mqtt.py    |<-------------------->| MQTT Broker (Mosquitto) |
-| (ArduPilot/PX4)     |                    | (On Drone/Companion)|                    |                       |
-+---------------------+                    +-------------------+                     +-----------------------+
-                                                                                           ^
-                                                                                           | MQTT (TLS)
-                                                                                           v
-                                                                                    +-----------------------+
-                                                                                    | ground_station.py     |
-                                                                                    | (Remote Computer)     |
-                                                                                    +-----------------------+
++---------------------+      MAVLink       +-------------------+      MQTT (TLS)       +------------------------+
+| Flight Controller   |<------------------>|  drone_mqtt.py     |<-------------------->| MQTT Broker (Mosquitto)|
+| (ArduPilot/PX4)     |                    |(On Drone/Companion)|                      |                        |
++---------------------+                    +-------------------+                       +------------------------+
+                                                                                               ^
+                                                                                               | MQTT (TLS)
+                                                                                               v
+                                                                                       +-----------------------+
+                                                                                       | ground_station.py     |
+                                                                                       | (Remote Computer)     |
+                                                                                       +-----------------------+
 ```
 
 ## Prerequisites

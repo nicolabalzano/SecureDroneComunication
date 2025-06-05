@@ -1,3 +1,5 @@
 creare un grafico (tempo comandi con le due curve)
 
-Cercare aziende che implementaiton sistemi di sicurezza
+Cercare aziende che implementaiton sistemi di sicurezza (fatto)
+
+cancellare immagini latenza TLS vs NO TLS vecchie (non zoomate)

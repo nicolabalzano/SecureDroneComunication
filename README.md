@@ -1,4 +1,4 @@
-# Drone Control via MAVLink and MQTT
+# Drone Control via MAVLink and MQTT using TLS
 
 This project enables remote control of a MAVLink-compatible drone (e.g., ArduPilot) over an MQTT messaging bus. It allows for sending commands to the drone and receiving telemetry data through a secure MQTT connection.
 
